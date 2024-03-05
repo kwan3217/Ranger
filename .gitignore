@@ -1,2 +1,7 @@
 venv/
+*.txt
+*.bsp
+*.bc
+*.dump
+*.tls
 
