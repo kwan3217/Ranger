@@ -1,7 +1,7 @@
 """
 Created on Dec 6, 2017
 
-@author: chrisj
+@author: kwan3217
 """
 
 import csv
@@ -22,49 +22,50 @@ os.chdir('../../../Data/spice/Ranger/')
 cspice.furnsh('Ranger7Background.tm')
 os.chdir(old)
 
-#mu_moon=4904.8695     #Value from Vallado of gravitational parameter of Moon in km and s
-#mu_earth=398600.4415  #Value from Vallado of gravitational parameter of Earth in km and s
+# mu_moon=4904.8695     #Value from Vallado of gravitational parameter of Moon in km and s
+# mu_earth=398600.4415  #Value from Vallado of gravitational parameter of Earth in km and s
 mu_moon =cspice.gdpool("BODY301_GM",0,1)[0]  #DE431 value of gravitational parameter of Moon in km and s
 mu_earth=cspice.gdpool("BODY399_GM",0,1)[0] #DE431 value of gravitational parameter of Earth in km and s
-#Documented Ranger 7 impact points. All seem to be in Mean-Earth-Pole coordinates
-#From Image A, last row (value is actually from point 1 from the previous row, 2.5s before impact)
-#lat: -10.630   lon: -20.588   r: 1735.455   GMT: 1961-Jul-31 13:25:48.799
+# Documented Ranger 7 impact points. All seem to be in Mean-Earth-Pole coordinates
+# From Image A, last row (value is actually from point 1 from the previous row, 2.5s before impact)
+# lat: -10.630   lon: -20.588   r: 1735.455   GMT: 1961-Jul-31 13:25:48.799
 ImageALLR=(-10.630,-20.588,1735.455)
-#From Wagner 02/2017 (https://doi.org/10.1016/j.icarus.2016.05.011)
-#lat: -10.6340  lon: 339.3230  r: 1735.609
+# From Wagner 02/2017 (https://doi.org/10.1016/j.icarus.2016.05.011)
+# lat: -10.6340  lon: 339.3230  r: 1735.609
 #                   (-20.6770)
 WagnerLLR=(-10.6340,-20.6770,1735.609)
-#From http://lroc.sese.asu.edu/posts/650 (2013 update)
-#lat: -10.6340  lon: 339.3229
+# From http://lroc.sese.asu.edu/posts/650 (2013 update)
+# lat: -10.6340  lon: 339.3229
 #                   (-20.6771)
-#From http://lroc.sese.asu.edu/posts/938 (same as Wagner 02/2017 above)
-#lat: -10.6340  lon: 339.3230  el: -1.791
+# From http://lroc.sese.asu.edu/posts/938 (same as Wagner 02/2017 above)
+# lat: -10.6340  lon: 339.3230  el: -1.791
 #                   (-20.6770)
-#From Trajectory table selenocentric (copied from program output below)
-#lat: -10.693   lon: -20.676   r: 1735.600   GMT: 1964-Jul-31 13:25:48.724
+# From Trajectory table selenocentric (copied from program output below)
+# lat: -10.693   lon: -20.676   r: 1735.600   GMT: 1964-Jul-31 13:25:48.724
 TrajLLR=(-10.693,-20.676,1735.600)
 
-#Reported radius of Moon at impact point. Take this from one of the LLRs
+# Reported radius of Moon at impact point. Take this from one of the LLRs
 r_moon=ImageALLR[2]
 
 def gmt_to_et(gmt):
     """
-Calculate ET from given GMT, bypassing spice leap second kernels. Spice does not properly handle the "rubber second"
-era. Ranger 7 was launched during this era, so we have to deal with it.
+    Calculate ET from given GMT, bypassing spice leap second kernels.
 
-Since the times have a rated accuracy of 5ms (even though they appear to have a sub-millisecond moment-to-moment
-consistency) we don't need to worry about such things as the change in MJD over the approach time. However, "Absurd
-Accuracy is Our Obsession", so since we *can* do it, we *will* do it.
-    
-Ranger 7 was flown when the following row in tai-utc.dat was valid
-
-1964 APR  1 =JD 2438486.5  TAI-UTC=   3.3401300 S + (MJD - 38761.) X 0.001296 S
-
-:param str gmt: GMT to convert. Any time acceptable to cspice.str2et is acceptable, except that
+    :param gmt: GMT to convert. Any time acceptable to cspice.str2et is acceptable, except that
                 there must not be a time scale tag like UTC on it. Suggested is 1964-Jul-31 13:25:12.345
-:return: Spice ET of given time
-:rtype: float64
-"""
+    :return: Spice ET of given time
+
+    Spice does not properly handle the "rubber second" era. Ranger 7 was launched during this era,
+    so we have to deal with it.
+
+    Since the times have a rated accuracy of 5ms (even though they appear to have a sub-millisecond moment-to-moment
+    consistency) we don't need to worry about such things as the change in MJD over the approach time. However, "Absurd
+    Accuracy is Our Obsession", so since we *can* do it, we *will* do it.
+
+    Ranger 7 was flown when the following row in tai-utc.dat was valid
+
+    1964 APR  1 =JD 2438486.5  TAI-UTC=   3.3401300 S + (MJD - 38761.) X 0.001296 S
+    """
     #Tell Spice that the incoming times are TDT. This is a lie, but we will correct it piece by piece.
     #Tell Spice that it is TDT rather than TDB. Spice itself will return an ET value, which 
     #includes the TDT to TDB (Spice ET) correction
@@ -80,6 +81,7 @@ Ranger 7 was flown when the following row in tai-utc.dat was valid
     #Add the ET-TAI correction to get Spice ET
     et=tai+32.184
     return et
+
 
 def llr_to_xyz(lat,lon,radius=1.0,az=False,deg=False):
     """
@@ -102,6 +104,7 @@ def llr_to_xyz(lat,lon,radius=1.0,az=False,deg=False):
                             np.cos(lat) * np.sin(lon),
                             np.sin(lat)])
 
+
 def floatN(x):
     """
     Convert the input to a floating point number if possible, but return NaN if it's not
@@ -112,6 +115,7 @@ def floatN(x):
         return float(x)
     except ValueError:
         return float('NaN')
+
 
 def ray_sphere_intersect(r0, v, re):
     """
@@ -158,12 +162,14 @@ def ray_sphere_intersect(r0, v, re):
     # Finish using the ray equation to find the coordinates of p1 from the spacecraft pos/vel
     return (t, r0 + v * t)
 
+
 image_a_tuple=namedtuple('image_a_tuple',['PhotoNum','GMT',
                                           'sc_alt','sc_lat','sc_lon',
                                           'p2_lat','p2_lon','p2_srange',
                                           'v','pth','az',
                                           'p1_lat','p1_lon','p1_srange',
                                           'azn'])
+
 
 def readImageA(latofs=0,lonofs=0,rofs=0):
     """
@@ -208,35 +214,37 @@ def processImageA(image_a,plot=False):
     """
     Convert Image A table to usable state vectors, and calculate the check values
 
-    The tables include the spacecraft position in lat/lon/alt coordinates. Altitude is defined to be zero at impact, so the
-    reference surface is a sphere centered on the Moon's center of mass and has radius equal to the radius at impact. The
-    latitude and longitude are referenced to the Mean-Earth Polar system, as realized by this report. This gives a final
-    impact point about 2700m away from where LRO found the impact crater.
-
-    All reticle marks are numbered, with point 2 being the center mark. Point 1 is the velocity vector as described above.
-    For all such marks, the table includes the latitude and longitude on the reference surface, the distance from the
-    spacecraft to that point, several azimuths including the azimuth between the image vertical and true North.
-
-    Table "Point 1" is the point on the Lunar surface that the spacecraft is moving directly towards, based on
-    its instantaneous velocity vector in a lunar body-fixed frame. This is the point that doesn't move as the
-    spacecraft approaches the moon. The image appears to zoom in centered around this point.
-
-    Table "Point 2" is the point on the Lunar surface covered by the center reticle mark. It also has latitude, longitude,
-    and slant range
-
-    Much of the data which was entered is redundant - point 1 is completely determined by the spacecraft position and velocity
-    vector. Slant ranges are always calculable from the point latitudes and longitudes and the spacecraft position.
-    These values were transcribed anyway, to validate the position and velocity transcription. Ideally, the calculated
-    values will be exactly equal to the table values, but due to limited precision in the table, particularly the latitudes
-    and longitudes, the values will be inconsistent on the few-meter level. Any discrepancy of more than 10m drew my
-    attention, and any larger than 20m indicated a transcription error, which was corrected.
-    
     :param array of namedtuple image_a: Rows from original table
     :param bool plot: If true, plot the check value residuals
     :rtype: tuple
     :return: First element is numpy array of position vectors, one row for each row in the table, 3 columns
              Second element is numpy array of velocity vectors, one row for each row in the table, 3 columns
              Third element
+
+    The tables include the spacecraft position in lat/lon/alt coordinates. Altitude is defined to be zero at impact,
+    so the reference surface is a sphere centered on the Moon's center of mass and has radius equal to the radius at
+    impact. The latitude and longitude are referenced to the Mean-Earth Polar system, as realized by this report.
+    This gives a final impact point about 2700m away from where LRO found the impact crater.
+
+    All reticle marks are numbered, with point 2 being the center mark. Point 1 is the velocity vector as described
+    above. For all such marks, the table includes the latitude and longitude on the reference surface, the distance
+    from the spacecraft to that point, several azimuths including the azimuth between the image vertical and true
+    North.
+
+    Table "Point 1" is the point on the Lunar surface that the spacecraft is moving directly towards, based on
+    its instantaneous velocity vector in a lunar body-fixed frame. This is the point that doesn't move as the
+    spacecraft approaches the moon. The image appears to zoom in centered around this point.
+
+    Table "Point 2" is the point on the Lunar surface covered by the center reticle mark. It also has latitude,
+    longitude, and slant range
+
+    Much of the data which was entered is redundant - point 1 is completely determined by the spacecraft position
+    and velocity vector. Slant ranges are always calculable from the point latitudes and longitudes and the spacecraft
+    position. These values were transcribed anyway, to validate the position and velocity transcription. Ideally, the
+    calculated values will be exactly equal to the table values, but due to limited precision in the table, particularly
+    the latitudes and longitudes, the values will be inconsistent on the few-meter level. Any discrepancy of more than
+    10m drew my attention, and any larger than 20m indicated a transcription error, which was corrected.
+
     """
     rs=np.zeros((len(image_a),3),np.float64)
     vs=np.zeros((len(image_a),3),np.float64)
