@@ -6,6 +6,8 @@ Created on Dec 6, 2017
 
 import csv
 from collections import namedtuple
+from typing import Iterable
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -47,7 +49,8 @@ TrajLLR=(-10.693,-20.676,1735.600)
 # Reported radius of Moon at impact point. Take this from one of the LLRs
 r_moon=ImageALLR[2]
 
-def gmt_to_et(gmt):
+
+def gmt_to_et(gmt:str)->float:
     """
     Calculate ET from given GMT, bypassing spice leap second kernels.
 
@@ -210,7 +213,8 @@ def readImageA(latofs=0,lonofs=0,rofs=0):
                                         floatN(row[14]))) #azn
     return result
 
-def processImageA(image_a,plot=False):
+
+def processImageA(image_a:Iterable[image_a_tuple],plot:bool=False)->tuple[np.array,np.array]:
     """
     Convert Image A table to usable state vectors, and calculate the check values
 
