@@ -1,3 +1,9 @@
+"""
+Rectify the Ranger images. This puts all the reticles on as near as possible, the same
+spot in the grid, as the first image (TAB 1).
+"""
+from os.path import basename
+
 import numpy as np
 import scipy.misc
 import scipy.ndimage
@@ -5,7 +11,16 @@ import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 from PIL import Image
 
-Ranger7A_Reticle=(None,
+# Original images were 1150 scan lines. Since an analog TV signal doesn't
+# have pixels along a scan line, resolution in that direction is arbitrary.
+# It appears that scan lines on the images are "vertical", at least on the
+# A camera. The LPI archive stores the images at higher resolution than
+# that. One process that we do to the images is to scale them using
+# ImageMagick to have exactly 1150 columns, therefore roughly downsampling
+# the images to their original native resolution.
+
+Ranger7A_Reticle=((None,None,None,None,None,None,None,None),
+                  # nx     ny   xc   yc    xr   yr   xb   yb
                   (1150, 1126, 562, 477, 1061, 476, 564, 970),
                   (1150, 1129, 561, 481, 1059, 482, 560, 974),
                   (1150, 1118, 563, 469, 1059, 465, 565, 962),
@@ -214,16 +229,14 @@ yr1=yc1 #Ranger7A_Reticle[1][5]  #Force the image to be square, not following wh
 xb1=xc1 #Ranger7A_Reticle[1][6]
 yb1=Ranger7A_Reticle[1][7]
 
-for tab,coords in enumerate(Ranger7A_Reticle):
+img_root="/mnt/big/workspace/Data/Ranger"
+
+for tab,(nx,ny,xc,yc,xr,yr,xb,yb) in enumerate(Ranger7A_Reticle):
     if tab>0:
-        img=mpimg.imread("/home/jeppesen/workspace/pov/Ranger/7A/Ranger7A%03d.png"%tab)
+        infn=f"{img_root}/7A/Ranger7A{tab:03d}.png"
+        oufn=f"{img_root}/7A/Rect7A{tab:03d}.png"
+        img=mpimg.imread(infn)
         img=img*255 #Leave in floating-point, but scale so that everything is [0..255] instead of [0..1]. All pixels should be integral values.
-        xc=coords[2]
-        yc=coords[3]
-        xr=coords[4]
-        yr=coords[5]
-        xb=coords[6]
-        yb=coords[7]
         #Matrix which slides the pixels such that the center reticle of this image is at the origin
         To=np.array([[1,0,-yc],
                      [0,1,-xc],
@@ -247,8 +260,12 @@ for tab,coords in enumerate(Ranger7A_Reticle):
         #M=Tb@To
         print(tab)
         Mimg=scipy.ndimage.affine_transform(img,np.linalg.inv(M)).astype(np.uint8)
+        # One part of each scan line is covered by a mask for dark correction. We
+        # will trim that part off.
         Mimg=Mimg[:1000,:]
-        #plt.imshow(Mimg)
-        #plt.show()
+        plt.clf()
+        plt.title(basename(infn))
+        plt.imshow(Mimg)
+        plt.pause(0.001)
         img=Image.fromarray(Mimg, mode='L')
-        img.save("/home/jeppesen/workspace/pov/Ranger/7A/Rect7A%03d.png"%tab)
+        img.save(oufn)
