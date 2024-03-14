@@ -13,10 +13,14 @@ Ranger 7 Frames Kernel
 Version and Date
 -------------------------------------------------------------------------------
 
-   Version 0.0 -- May 22, 2009 -- Boris Semenov, NAIF
+   Version 0.0 -- May 22, 2009 -- Chris Jeppesen
 
-      Initial Release with spacecraft, HGA and UHF frames based on
-      temporary spacecraft ID -1007.
+      Initial Release with spacecraft ID -1007.
+
+
+   Version 0.1 -- 2024-03-08 -- Chris Jeppesen
+
+      Improved comments (removed more of the MAVEN boilerplate)
 
 
 References
