@@ -42,14 +42,28 @@ that transmitted back on two channels:
   wide-field lens, and had a field of view of about 22x24deg. Camera B used a 75mm
   focal length telephoto lens, and had a field of view of 9x8deg. Each camera was scanned with 1150
   scan lines. Each camera scanned the full design area (about 11x11mm) of the vidicon tube face
-  with those 1150 lines. 
-* Channel P (for Partial scan) carried cameras P1, P2, P3, and P4. Each of these fired in turn on
-  a 0.21s cadence, so each camera individually was on a 0.84s cadence. Cameras
-  P1 and P2 used the same optics as B (75mm lens) and resulted in the narrowest
+  with those 1150 lines. It takes 2.56s to scan and transmit each image, so while one camera is
+  being scanned and transmitted, the other is being erased and exposed for the next image.
+  No attempt was made to synchronize the camera cycle with impact, so the impact effectively
+  was at a uniformly-distributed random time during the last camera cycle. One of the cameras
+  will have taken an image between 5.12s and 2.56s before impact and completely transmitted it,
+  while the other will have taken an image between 2.56s and 0.00s and be interrupted by impact
+  during transmission. Since the vertical speed of impact is about 2km/s, the last complete image
+  will be taken between 5 and 10km altitude, and the last partial at less than 5km 
+  altitude.
+* Channel P (for Partial scan) carried cameras P1, P2, P3, and P4. These had a narrow field
+  of view, but were not designed for higher resolution. Instead, they were designed to fire
+  and readout as frequently as possible, so that the last image is as close as possible to the
+  surface. 
+  Each of these fired in turn on a 0.21s cadence, so each camera
+  individually was on a 0.84s cadence. Since a camera fires about every 0.2s, and the spacecraft
+  has a vertical speed of about 2km/s, we expect the last image taken to be from an altitude of 
+  less than 400m, and for the last complete image to be from between 800 and 400m. 
+  Cameras P1 and P2 used the same optics as B (75mm lens) and resulted in the narrowest
   fields of view at about 2x2deg, while P3 and P4 used the same optics
-  as A and had medium-fields at about 6x6deg. The P cameras had the same vidicon tube and electronics, but only scanned
-  about 3x3mm of the vidicon tube face. Because of this partial scan,
-  the cameras had a narrower field of view even with the same camera
+  as A and had medium-fields at about 6x6deg. The P cameras had the same vidicon tube
+  and electronics, but only scanned about 3x3mm of the vidicon tube face. Because of
+  this partial scan, the cameras had a narrower field of view even with the same camera
   optics. It's similar to the old "digital zoom" on older digital 
   cameras, that just saved the middle part of the image at the same
   pixel angular resolution but fewer pixels. Each of these cameras was scanned with only
@@ -78,7 +92,7 @@ principle be patched with data from the neighboring images.
 
 Not all images are available on the archive. The original record was kept in
 PODs (Primary Original mission Data record). Channels F and P had independent
-POD numbers. Each POD contains a single image. Cameras A and B alternated PODs
+POD numbers. Each F-channel POD contains a single image. Cameras A and B alternated PODs
 on channel F, with A being the even numbers and B the odd numbers. There
 appear to be 404 channel F PODs on Ranger 7, with the first A image being
 POD 8, the last being POD 404, and the first B image being POD 5 with the
@@ -102,7 +116,42 @@ The data archive is in the form of a JPEG image for each A exposure, a separate
 image for each B exposure, and a composite image of all 4 P expousres in a
 P POD.
 
-* Ranger 7 took 199 A images, 200 B images, and 200 images with each P camera.
+## Image Orientation
+
+* All A images are oriented such that the original scan lines were
+  vertical.
+* All B images are oriented such that the original scan lines are
+  vertical. The last scan was cut off by impact, and it interrupted
+  the *right* edge of the image, indicating that the lines
+  were scanned from left to right. A images are probably scanned
+  the same, but there is no image interruption to prove it.
+* In A TAB 79, there is a lava-filled crater (Guericke F)
+  just to the right of reticle point 18, the 
+  right-most reticle in the center row. To the
+  right of that, there is a large crater (Guericke)
+  with two small sharp craters (Guericke D and H) inside it.
+  These craters are also visible in B TAB 79,
+  much more zoomed in and much closer to
+  the center, between reticle points 2 and 3,7. This establishes
+  that the axis of camera B is to the right of camera A in the 
+  published image series. This in turn
+  means that the diagram of camera field overlaps should be
+  rotated 90deg counterclockwise to match the published images.
+* Comparison with a [modern map of Mare Cognitum](https://asc-planetarynames-data.s3.us-west-2.amazonaws.com/Lunar/lac_76_wac.pdf)
+  shows that the published image series has North generally
+  towards the top of the images.
+* Each of the A and B cameras have a mask on the bottom edge
+  of the image. This means that the mask is on the *left* edge
+  of the field-of-view diagrams. The masks mask part of each scan line
+  to give a black reference. Similarly all P cameras have a simplified
+  reticle and mask.
+* The top two (wider-field) images in the P TAB 1 include
+  Guericke and Guericke F. They also include a noticeable mountain range
+  to the left of center. The map shows this as being just north
+  of the line between Guericke B and Darney J. B is visible in
+  the images but J is not.
+* In a P image, P1 is lower left, P2 is lower right, P3 is
+  upper left, and P4 is upper right [figure 8 of Ranger VII Photographs of the Moon Part III - P Series](https://www.lpi.usra.edu/resources/ranger/book/3/)
 
 ## Sources
 * The Lunar and Planetary Institute (LPI) is the official NASA archive for
