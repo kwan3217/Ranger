@@ -187,7 +187,9 @@ def main():
             parts=line.strip().split(",")
             i_tab=int(parts[0].strip())
             trajectory[i_tab]=TrajectoryPoint(line=line)
-    tab143=trajectory[143]
+    # TAB number of camera7A reticle table
+    tab_complete=143
+    traj_complete=trajectory[143]
     # Position of spacecraft in Moon body-fixed frame
     rsc=tab143.r()
     # Position of reticles in same frame

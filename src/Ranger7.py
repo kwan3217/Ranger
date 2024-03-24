@@ -15,19 +15,16 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import optimize as opt
-import spiceypy as cspice
 import os
 import bmw
+from spiceypy import gdpool, str2et, timout, furnsh
 
-old=os.getcwd()
-os.chdir('../../../Data/spice/Ranger/')
-cspice.furnsh('Ranger7Background.tm')
-os.chdir(old)
+furnsh('kernels/Ranger7Background.tm')
 
 # mu_moon=4904.8695     #Value from Vallado of gravitational parameter of Moon in km and s
 # mu_earth=398600.4415  #Value from Vallado of gravitational parameter of Earth in km and s
-mu_moon =cspice.gdpool("BODY301_GM",0,1)[0]  #DE431 value of gravitational parameter of Moon in km and s
-mu_earth=cspice.gdpool("BODY399_GM",0,1)[0] #DE431 value of gravitational parameter of Earth in km and s
+mu_moon =gdpool("BODY301_GM",0,1)[0]  #DE431 value of gravitational parameter of Moon in km and s
+mu_earth=gdpool("BODY399_GM",0,1)[0] #DE431 value of gravitational parameter of Earth in km and s
 # Documented Ranger 7 impact points. All seem to be in Mean-Earth-Pole coordinates
 # From Image A, last row (value is actually from point 1 from the previous row, 2.5s before impact)
 # lat: -10.630   lon: -20.588   r: 1735.455   GMT: 1961-Jul-31 13:25:48.799
@@ -54,7 +51,7 @@ def gmt_to_et(gmt:str)->float:
     """
     Calculate ET from given GMT, bypassing spice leap second kernels.
 
-    :param gmt: GMT to convert. Any time acceptable to cspice.str2et is acceptable, except that
+    :param gmt: GMT to convert. Any time acceptable to str2et is acceptable, except that
                 there must not be a time scale tag like UTC on it. Suggested is 1964-Jul-31 13:25:12.345
     :return: Spice ET of given time
 
@@ -72,10 +69,10 @@ def gmt_to_et(gmt:str)->float:
     #Tell Spice that the incoming times are TDT. This is a lie, but we will correct it piece by piece.
     #Tell Spice that it is TDT rather than TDB. Spice itself will return an ET value, which 
     #includes the TDT to TDB (Spice ET) correction
-    gmt_num=cspice.str2et(gmt+" TDT")
+    gmt_num=str2et(gmt+" TDT")
     #Calculate the MJD. This doesn't specify what timescale (TAI, TDB, UTC, etc) is used, but
     #at our required level of accuracy, it doesn't matter.
-    jd=cspice.timout(gmt_num,"JULIAND.#########")
+    jd=timout(gmt_num,"JULIAND.#########")
     mjd=float(jd)-2400000.5
     #Calculate TAI-UTC from the formula row above 
     tai_utc=3.3401300+(mjd-38761.0)*0.001296
@@ -322,7 +319,7 @@ def processImageA(image_a:Iterable[image_a_tuple],plot:bool=False)->tuple[np.arr
             dv=dr/dt-row.v
             dvs[i]=dv
         r_last=r
-        #print(row.GMT, gmt, cspice.etcal(gmt), mjd,tai_utc,tai,et, cspice.etcal(et))
+        #print(row.GMT, gmt, etcal(gmt), mjd,tai_utc,tai,et, etcal(et))
     
     if plot:
         #This plot is meant to duplicate the residual plot on the spreadsheet
@@ -383,7 +380,7 @@ def convertImageACanonical(rs,vs,ts):
     vcus=np.zeros((len(ts),3))
     tcus=np.zeros( len(ts)   )
     for (i,(r,v,t)) in enumerate(zip(rs,vs,ts)):
-        M=cspice.sxform("IAU_MOON","ECI_TOD",t)
+        M=sxform("IAU_MOON","ECI_TOD",t)
         s=np.concatenate((r,v))
         Ms=np.matmul(M,s)
         rcus[i,:]=bmw.su_to_cu(Ms[0:3],r_moon,mu_moon,1, 0)
@@ -547,13 +544,13 @@ def cache_earth(ts):
     rEarth=np.zeros((ts.size*2-1,3),np.float64)
     dvdtEM=np.zeros((ts.size*2-1,3),np.float64)
     for i in range(ts.size):
-        (xEarth, _) = cspice.spkezr('399', ts[i], 'ECI_TOD', 'NONE', '301')
+        (xEarth, _) = spkezr('399', ts[i], 'ECI_TOD', 'NONE', '301')
         rEarth[i*2,:] = bmw.su_to_cu(xEarth[0:3], r_moon, mu_moon, 1, 0)
         # acceleration of the *moon*  from the gravity of the Earth. This isn't quite right,
         # as it doesn't take into account the non-negligible mass of the moon.
         dvdtEM[i*2,:] = (mu_earth/mu_moon)*rEarth[i*2,:]/np.linalg.norm(rEarth[i*2,:]) ** 3
         if i<tas.size-1:
-            (xEarth, _) = cspice.spkezr('399', (ts[i]+ts[i+1])/2, 'ECI_TOD', 'NONE', '301')
+            (xEarth, _) = spkezr('399', (ts[i]+ts[i+1])/2, 'ECI_TOD', 'NONE', '301')
             rEarth[i*2+1,:] = bmw.su_to_cu(xEarth[0:3], r_moon, mu_moon, 1, 0)
             dvdtEM[i*2+1,:] = (mu_earth/mu_moon)*rEarth[i*2,:]/np.linalg.norm(rEarth[i*2,:]) ** 3
     return rEarth, dvdtEM
@@ -657,80 +654,6 @@ def gradient_descent(F,x0,args=(),delta=1e-14,gamma0=1e-12,adapt=False,plot=Fals
         plt.show()
     return xn
 
-def point_toward(p_b,t_b,p_r,t_r):
-    """
-    Calculate the Point-Toward matrix
-    :param np vector p_b: Point vector in body frame
-    :param np vector t_b: Toward vector in body frame
-    :param np vector p_r: Point vector in reference frame
-    :param np vector t_r: Toward vector in reference vector
-    :return: A 3x3 matrix which transforms from the body frame to the reference frame, pointing the
-    Point body vector to the Point reference vector, and aligning the toward vectors as close as possible.
-    :rtype np matrix:
-    """
-    s_b=np.cross(p_b,t_b) #vector normal to both
-    s_b/=np.linalg.norm(s_b) #force to unit vector
-    s_r=np.cross(p_r,t_r)
-    s_r/=np.linalg.norm(s_r)
-    u_b=np.cross(p_b,s_b)
-    u_b/=np.linalg.norm(u_b) #p_b might not be a unit vector
-    u_r=np.cross(p_r,s_r)
-    u_r/=np.linalg.norm(u_r) #likewise p_r
-    B=np.column_stack((p_b,s_b,u_b))
-    R=np.column_stack((p_r,s_r,u_r))
-    M=np.dot(R,B.transpose())
-    return M
-
-def test_point_toward(p_b=None,t_b=None,p_r=None,t_r=None,M=None):
-    """
-    Test if the Point-Toward algorithm is working by printing the transformed body vectors
-    next to the reference vectors. If the algorithm is working, the vectors should be
-    equal to within floating-point accuracy.
-
-    :param p_b: Point body vector to test with. If not supplied, all of the vectors
-                will be calculated from the Space Shuttle test case in the Kwan
-                Hypertext Library
-    :param t_b: Toward body vector. If p_b is not supplied, any value passed as t_b
-                is ignored as t_b is recalculated.
-    :param p_r: Point reference vector. Recaluclated like t_b if needed.
-    :param t_r: Toward reference vector. Recalculated if needed
-    :param M:   Matrix which transforms a vector from the body frame to the
-                reference frame. If not supplied, calculated from the vector parameters
-                (note - if vector parameters are passed but M is not, M will be calculated
-                from the passed vector parameters, which shall be used as-is.)
-    """
-    if p_b is None:
-        thrust_ofs=np.radians(-13)
-        p_b=np.array((np.cos(thrust_ofs),0,np.sin(thrust_ofs)))
-        t_b=np.array((0.0,0.0,1.0))
-        thrust_el=30.0
-        thrust_az=80.0
-        p_r=llr_to_xyz(lat=thrust_el,lon=thrust_az,deg=True,az=True)
-        t_r=np.array((0.0,0.0,-1.0))
-    if M is None:
-        M=point_toward(p_b=p_b,t_b=t_b,p_r=p_r,t_r=t_r)
-    s_b=np.cross(p_b,t_b)
-    s_b/=np.linalg.norm(s_b)
-    s_r=np.cross(p_r,t_r)
-    s_r/=np.linalg.norm(s_r)
-    u_b=np.cross(p_b,s_b)
-    u_r=np.cross(p_r,s_r)
-    print("p_b: ",p_b)
-    print("t_b: ",t_b)
-    print("p_r: ",p_r)
-    print("t_r: ",t_r)
-    print(M)
-    print("M*p_b: ", np.dot(M, p_b))
-    print("p_r:   ", p_r)
-    print("M*s_b: ", np.dot(M, s_b))
-    print("s_r:   ", s_r)
-    print("M*u_b: ", np.dot(M, u_b))
-    print("u_r:   ", u_r)
-    print("M*t_b: ", np.dot(M, t_b))
-    print("t_r:   ", t_r)
-
-test_point_toward()
-
 image_a=readImageA(latofs=ImageALLR[0]-WagnerLLR[0],lonofs=ImageALLR[1]-WagnerLLR[1]) #Read table A
 print(image_a[-1])
 (recias,vecias,tas)=processImageA(image_a,plot=True)
@@ -797,7 +720,7 @@ traj=read_trajectory()
 (t,GeoState,SelenoState)=process_trajectory(traj)
 
 #Convert last SelenoState from ECI_TOD to IAU_MOON lat/lon, for comparison with other coordinates
-M=cspice.sxform('ECI_TOD','IAU_MOON',t[-1])
+M=sxform('ECI_TOD','IAU_MOON',t[-1])
 print(traj[-1].GMT,t[-1],M)
 Ms = np.matmul(M, SelenoState[-1,:])
 print(Ms)
@@ -882,7 +805,7 @@ FRAME_DEF_FILE='%s/fk/eci_tod.tf'
 LEAPSECONDS_FILE='%s/lsk/naif0011.tls'
 """ % (mu_moon,'../../Data/spice/generic','../../Data/spice/generic')
 
-Ranger7Seleno2_txt="""
+Ranger7Seleno2_txt=f"""
 Ranger 7 - first completely successful Ranger lunar impact mission. Data from
 'Ranger VII Photographic Parameters', JPL Technical Report No. 32-964, 1 Nov 1966
 available at NTRS as document number 19670002488 
@@ -890,9 +813,9 @@ available at NTRS as document number 19670002488
 The report had a table of camera parameters including the position of the spacecraft
 in a selenocentric body-fixed (Mean-earth-polar) frame for each picture published in
 the photo atlases. This spice segment uses the positions from the A camera, starting 
-about 15min before impact at %s, and ending with the last A
-camera image 2.5s before impact at %s. There is also a 
-calculated state at impact, at %s. 
+about 15min before impact at {image_a[0].GMT}, and ending with the last A
+camera image 2.5s before impact at {image_a[-2].GMT}. There is also a 
+calculated state at impact, at {image_a[-1].GMT}. 
 
 The table seems to have had a bias in longitude, as it matches neither the previous
 segments nor the actual location of the crater as found by LRO/LROC. This bias is 
@@ -917,10 +840,10 @@ TIME_WRAPPER='# ETSECONDS'
 INPUT_DATA_UNITS = ('ANGLES=DEGREES' 'DISTANCES=km')
 DATA_DELIMITER=';'
 LINES_PER_RECORD=1
-CENTER_GM=%9.4f
+CENTER_GM={mu_moon:9.4f}
 FRAME_DEF_FILE='%s/fk/eci_tod.tf'
 LEAPSECONDS_FILE='%s/lsk/naif0012.tls'
-""" % (image_a[0].GMT,image_a[-2].GMT,image_a[-1].GMT,mu_moon,'../../../Data/spice/generic','../../../Data/spice/generic')
+""" % ('../../../Data/spice/generic','../../../Data/spice/generic')
 
 tofs=None
 with open('geo.txt','w') as ouf_geo:
@@ -976,7 +899,7 @@ subprocess.call("~/bin/mkspk -setup Ranger7Geo_mkspk.txt     -input geo.txt     
 subprocess.call("~/bin/mkspk -setup Ranger7Seleno_mkspk.txt  -input seleno.txt  -output Ranger7.bsp -append",shell=True)
 subprocess.call("~/bin/mkspk -setup Ranger7Seleno2_mkspk.txt -input seleno2.txt -output Ranger7.bsp -append",shell=True)
 
-cspice.furnsh("Ranger7.bsp")
+furnsh("Ranger7.bsp")
 
 selenostatepos_x=[]
 selenostatepos_y=[]
@@ -998,13 +921,13 @@ spicepos_y=np.zeros(n_step)
 spicepos_z=np.zeros(n_step)
 
 for i,tt in enumerate(step):
-    (spice_state,ltime)=cspice.spkezr('-1007',tt,'ECI_TOD','NONE','301')
+    (spice_state,ltime)=spkezr('-1007',tt,'ECI_TOD','NONE','301')
     spice_pos=spice_state[0:3]
     spicepos_x[i]=spice_pos[0]
     spicepos_y[i]=spice_pos[1]
     spicepos_z[i]=spice_pos[2]
     spice_vel=spice_state[3:6]
-    print(cspice.etcal(tt),tt,spice_state)
+    print(etcal(tt),tt,spice_state)
 
 if False:
     plt.figure(4)
@@ -1086,9 +1009,9 @@ with open('Ranger7ck.txt','w') as ouf_ck:
         et=gmt_to_et(row.GMT)
         #Point 2 on reference surface of Moon
         p2_mep = llr_to_xyz(lat=row.p2_lat, lon=row.p2_lon, deg=True, radius=r_moon)
-        M_mep_eci=cspice.pxform("IAU_MOON","ECI_TOD",et)
+        M_mep_eci=pxform("IAU_MOON","ECI_TOD",et)
         p2_eci=np.dot(M_mep_eci,p2_mep)
-        sc_eci,_=cspice.spkezr("-1007",et,"ECI_TOD","NONE","301")
+        sc_eci,_=spkezr("-1007",et,"ECI_TOD","NONE","301")
         p_r=p2_eci-sc_eci[0:3]
         p_r/=np.linalg.norm(p_r)
         t_r=np.dot(M_mep_eci,t_r_mep)
@@ -1107,25 +1030,25 @@ except FileNotFoundError:
     pass #no error, file is already not present
 subprocess.call("~/bin/msopck Ranger7_msopck.txt Ranger7ck.txt Ranger7.bc",shell=True)
 
-cspice.furnsh("Ranger7.bc")
-cspice.furnsh("Ranger7.tf")
-cspice.furnsh("Ranger7.tsc")
+furnsh("Ranger7.bc")
+furnsh("Ranger7.tf")
+furnsh("Ranger7.tsc")
 
 for row in image_a:
     azn = np.radians(row.azn)
     t_b = tN_b * np.cos(azn) + tE_b * np.sin(azn)
     et = gmt_to_et(row.GMT)
     # Point 2 on reference surface of Moon
-    M_mep_eci = cspice.pxform("IAU_MOON", "ECI_TOD", et)
+    M_mep_eci = pxform("IAU_MOON", "ECI_TOD", et)
     p2_eci = np.dot(M_mep_eci, p2_mep)
-    sc_eci, _ = cspice.spkezr("-1007", et, "ECI_TOD", "NONE", "301")
+    sc_eci, _ = spkezr("-1007", et, "ECI_TOD", "NONE", "301")
     p_r = sc_eci[0:3] - p2_eci
     p_r /= np.linalg.norm(p_r)
     t_r = np.dot(M_mep_eci, t_r_mep)
     M = point_toward(p_b=p_b, p_r=p_r, t_b=t_b, t_r=t_r)
     test_point_toward(p_b=p_b, p_r=p_r, t_b=t_b, t_r=t_r,M=M)
     print("M:       ",M)
-    M_spice=cspice.pxform("RANGER7_SPACECRAFT","ECI_TOD",et)
+    M_spice=pxform("RANGER7_SPACECRAFT","ECI_TOD",et)
     test_point_toward(p_b=p_b, p_r=p_r, t_b=t_b, t_r=t_r,M=M_spice)
     print("M_spice: ",M_spice)
 
