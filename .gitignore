@@ -1,8 +1,3 @@
 venv/
-*.txt
-*.bsp
-*.bc
-*.dump
-*.tls
 .pytest_cache/
 
