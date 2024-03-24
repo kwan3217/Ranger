@@ -4,4 +4,5 @@ venv/
 *.bc
 *.dump
 *.tls
+.pytest_cache/
 
