@@ -1,6 +1,33 @@
 """
 Convert GMT times to modern time scales
 
+Usage:
+
+Given a time in the Ranger documentation, we can interpret it as GMT
+which is by definition the same as UTC. For instance, the impact time
+of Ranger 7 is 1964-07-31T13:25:48.799 GMT. We represent this as:
+
+```
+>>> gmt_r7imp=datetime(year=1964,month=7,day=31,hour=13,minute=25,second=48,microsecond=799000,tzinfo=timezone.utc)
+>>> print(gmt_r7imp)
+1964-07-31 13:25:48.799000+00:00
+```
+
+Now if we want to use this time in Spice, we can use the TDB timezone
+object:
+
+```
+>>> from gmt import tdb
+>>> tdb_r7imp=gmt_r7imp.astimezone(tdb)
+>>> print(tdb_r7imp)
+1964-07-31 13:26:24.322391+00:00:35.523391
+```
+
+Note that:
+* This time is ahead of the time in GMT (IE 13:26:24 is after 13:25:48)
+* The difference is about 35s
+* The exact difference is shown as the timezone offset, given to microsecond precision
+
 The Ranger documentation always uses the term Greenwich Mean Time, GMT
 and never UTC. We will treat GMT as the name of time scale *actually*
 used by Ranger.
@@ -73,10 +100,11 @@ code, I refer to times in this era as GMT. After 1972, the powers-that-be gave u
 some of this straddling, and defined the difference between TAI and UTC to be an
 integer number of seconds. This number of seconds is occasionally changed in order
 to keep the top of the UTC second within 0.9s of the top of the UT second. The
-change is implemented by inserting a second labeled 23:59:60 UTC. This second is
-referred to as a "leap second". The system allows for a negative leap second by
-skipping 23:59:59, but this has not yet occurred in practice. I consistently refer
-to time in this "leap second" era as UTC.
+change is implemented by inserting a second labeled 23:59:60 UTC on either the
+last day of June or the last day of December. This second is referred to as a
+"leap second". The system allows for a negative leap second by skipping 23:59:59,
+but this has not yet occurred in practice. I consistently refer to time in this
+"leap second" era as UTC.
 
 Ranger was flown during the GMT era. Ranger 7 was timed with the WWV
 time signal. Its exact time of impact was recorded at DSS-12 (Echo Station
@@ -115,6 +143,30 @@ def calc_jd(dt:datetime)->float:
     # Calculate the JD as the number of days from the epoch, plus the
     # JD count on the epoch.
     return _jd0+(naive-_dt0).total_seconds()/86400.0
+
+
+def calc_et(dt:datetime)->float:
+    """
+    Calculate the number of seconds from the J2000 epoch of any datetime object
+    in its own timezone. If the time zone is TDB, this will be exactly the Spice
+    ephemeris time count.
+
+    :param dt: Datetime object. Will work for any time zone (or no time zone)
+               but only produces a true Spice ET for datetime objects with the
+               TDB time zone.
+    :return: count of seconds after J2000. Will be negative for times before then.
+
+    Usage:
+    Given a time in any timezone, first convert it to TDB:
+        dt_tdb=dt_utc.astimezone(tdb)
+    Then, use this function to get spice
+        et=calc_et(dt_tdb)
+    """
+    # Strip off any timezone information from the given time stamp.
+    naive=dt.replace(tzinfo=None)
+    # Calculate the JD as the number of days from the epoch, plus the
+    # JD count on the epoch.
+    return (naive-_dt0).total_seconds()
 
 
 # Time conversion table, including rubber seconds. This covers the entire era of
@@ -235,7 +287,7 @@ class TAI(tzinfo):
 
 class TDT(tzinfo):
     """
-    Implement TAI as a proper time zone.
+    Implement Terrestrial Time (TDT) as a proper time zone.
     """
     def dst(self, dt):
         # a fixed-offset class:  doesn't account for DST
@@ -245,8 +297,8 @@ class TDT(tzinfo):
 
         :param dt: Date and time. If given a naive datetime object (no tzinfo)
                    then assume the time is GMT/UTC.
-        :return: difference between UTC and TAI. Will have microsecond precision,
-                 and a nonzero microsecond count during the era of rubber seconds.
+        :return: difference between UTC and TDT. Will have microsecond precision,
+                 and a nonzero microsecond count at all times.
         """
         return tai_utc(dt=dt)+tdt_tai(dt=dt)
     def tzname(self,dt:datetime)->str:
@@ -255,7 +307,7 @@ class TDT(tzinfo):
 
 class TDB(tzinfo):
     """
-    Implement TAI as a proper time zone.
+    Implement Barycentric Dynamical Time (TDB) as a proper time zone.
     """
     def dst(self, dt):
         # a fixed-offset class:  doesn't account for DST
@@ -265,12 +317,11 @@ class TDB(tzinfo):
 
         :param dt: Date and time. If given a naive datetime object (no tzinfo)
                    then assume the time is GMT/UTC.
-        :return: difference between UTC and TAI. Will have microsecond precision,
-                 and a nonzero microsecond count during the era of rubber seconds.
+        :return: difference between UTC and TDB. Will have microsecond precision.
         """
         return tai_utc(dt=dt)+tdt_tai(dt=dt)+tdb_tdt(dt=dt)
     def tzname(self,dt:datetime)->str:
-        return "TDT"
+        return "TDB"
 
 
 tai=TAI()
