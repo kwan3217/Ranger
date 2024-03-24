@@ -2,7 +2,10 @@
 Use what we have learned from image correlation to try to automatically find
 all of the reticle markings in a Ranger image.
 """
+import re
 from collections.abc import Iterable
+from glob import glob
+from os import mkdir, unlink, remove
 
 import numpy as np
 from PIL import Image
@@ -23,8 +26,6 @@ from correlate import img_offset, cross_image
 # the next row starting at 5, etc. Since there are 4 complete rows, this will give us 20 marks, numbered
 # 0 to 19. Note that these are *NOT* the same numbering as in the photo parameter reports, but are 1-to-1
 # convertible to that numbering.
-
-# Load the first image, and manually click the reticle marks
 
 
 def transform_image(img:np.ndarray,M_to_from:np.ndarray,*,output_shape:tuple[int,int]=None)->np.ndarray:
@@ -87,7 +88,7 @@ def transform_image(img:np.ndarray,M_to_from:np.ndarray,*,output_shape:tuple[int
     return outimg
 
 
-def calc_M_img_big(shape:np.ndarray,n_scanlines:int=1150)->np.ndarray:
+def calc_M_img_big(shape:np.ndarray,n_scanlines:int)->np.ndarray:
     # Return a matrix that scales coordinates in the full-resolution image down
     # to the corresponding coordinate in the 1150-sample image.
     M = np.array([[n_scanlines/shape[1], 0,0],
@@ -96,7 +97,7 @@ def calc_M_img_big(shape:np.ndarray,n_scanlines:int=1150)->np.ndarray:
     return M
 
 
-def scaledown(img:np.ndarray,n_scanlines:int = 1150)->np.ndarray:
+def scaledown(img:np.ndarray,n_scanlines:int)->np.ndarray:
     """
     # Scale image to 1150 pixels wide (to roughly match scan resolution)
 
@@ -110,86 +111,207 @@ def scaledown(img:np.ndarray,n_scanlines:int = 1150)->np.ndarray:
     return outimg
 
 
-img_root="/mnt/big/workspace/Data/Ranger"
+def get_synthetic_masks(mission:int,channel:str)->list[np.ndarray]:
+    def synthetic_mark(*,
+                       r: int = 50, l: int = 30, w2: int = 2,
+                       n: bool, s: bool, e: bool, w: bool,
+                       bg: int = 0, fg: int = 255) -> np.ndarray:
+        result = np.zeros((r * 2, r * 2), dtype=np.uint8) + bg
+        if n:
+            result[r - l:r + w2, r - w2:r + w2] = fg
+        if s:
+            result[r - w2:r + l, r - w2:r + w2] = fg
+        if e:
+            result[r - w2:r + w2, r - w2:r + l] = fg
+        if w:
+            result[r - w2:r + w2, r - l:r + w2] = fg
+        return result
 
-manual_tab1_reticle= [None] * 20
-current_click=0
+    synthetic_masks=[
+        synthetic_mark(n=True , s=True , e=True , w=False),
+        synthetic_mark(n=False, s=True , e=True , w=False),
+        synthetic_mark(n=False, s=True , e=True , w=True ),
+        synthetic_mark(n=False, s=True , e=False, w=True ),
+        synthetic_mark(n=True , s=True , e=False, w=True ),
 
-tab = 1
-channel="B"
-infn = f"{img_root}/7{channel}/Ranger7{channel}{tab:03d}.jpg"
-oufn = f"{img_root}/7{channel}/Rect7{channel}{tab:03d}.png"
-bigimg1=mpimg.imread(infn)
-img1 = scaledown(bigimg1)
+        synthetic_mark(n=True , s=True , e=True , w=False),
+        synthetic_mark(n=True , s=True , e=True , w=False),
+        synthetic_mark(n=True , s=True , e=True , w=True ),
+        synthetic_mark(n=True , s=True , e=False, w=True ),
+        synthetic_mark(n=True , s=True , e=False, w=True ),
 
-print(f"{infn},{img1.shape},{img1.dtype}")
+        synthetic_mark(n=True , s=True , e=True , w=False),
+        synthetic_mark(n=True , s=False, e=True , w=False),
+        synthetic_mark(n=True , s=False, e=True , w=True ),
+        synthetic_mark(n=True , s=False, e=False, w=True ),
+        synthetic_mark(n=True , s=True , e=False, w=True ),
 
-manual_tab1_reticles={
-    "A":[
-    #  xdata     ydata
-    (  74.571,   235.829),
-    ( 314.931,   236.818),
-    ( 558.917,   235.170),
-    ( 808.148,   233.955),
-    (1060.956,   231.900),
-    (  76.603,   478.858),
-    ( 317.079,   479.016),
-    ( 561.931,   476.805),
-    ( 809.468,   475.069),
-    (1060.635,   474.595),
-    (  77.909,   722.763),
-    ( 318.815,   721.816),
-    ( 563.352,   720.711),
-    ( 811.046,   719.922),
-    (1060.793,   720.553),
-    (  77.120,   968.879),
-    ( 318.973,   969.668),
-    ( 564.142,   969.826),
-    ( 811.836,   970.615),
-    (1060.793,   972.668),
-],
-    "B":[
-    (  91.531,   219.808), #  0
-    ( 330.130,   223.859), #  1
-    ( 572.052,   225.833), #  2
-    ( 818.025,   227.391), #  3
-    (1066.802,   229.676), #  4
-    (  90.077,   459.653), #  5
-    ( 329.195,   462.249), #  6
-    ( 570.493,   463.496), #  7
-    ( 815.532,   465.158), #  8
-    (1063.167,   467.755), #  9
-    (  87.273,   702.717), # 10
-    ( 327.325,   703.340), # 11
-    ( 569.143,   704.275), # 12
-    ( 813.974,   705.937), # 13
-    (1060.466,   710.508), # 14
-    (  81.560,   950.664), # 15
-    ( 323.378,   950.872), # 16
-    ( 566.858,   951.910), # 17
-    ( 812.104,   954.092), # 18
-    (1058.389,   959.285), # 19
-]
-}
+        synthetic_mark(n=True , s=False, e=True , w=False, l=50),
+        synthetic_mark(n=True , s=False, e=True , w=True ),
+        synthetic_mark(n=True , s=False, e=True , w=True ),
+        synthetic_mark(n=True , s=False, e=True , w=True ),
+        synthetic_mark(n=True , s=False, e=False, w=True , l=50),
+    ]
+    return synthetic_masks
+
+lattice_config={7:{"A":((-2,-1,0,1,2),(-1,0,1,2)),
+                   "B":((-2,-1,0,1,2),(-1,0,1,2))},
+                8:{"A":((-2,-1,0,1,2),(-1,0,1,2)),
+                   "B":((-2,-1,0,1,2),(-1,0,1,2))}}
 
 
-if False:
-    # Collect the clicks
-    def on_click(event):
-        if event.button==MouseButton.RIGHT:
-            global current_click
-            manual_tab1_reticle[current_click]=(event.xdata, event.ydata)
-            print(f"    ({event.xdata:8.3f},  {event.ydata:8.3f}), # {current_click:2d}")
-            plt.plot(event.xdata,event.ydata,'b+')
-            plt.pause(0.001)
-            current_click+=1
-    plt.imshow(img1)
-    plt.connect('button_press_event', on_click)
-    plt.show()
-else:
-    # Clicks have already been collected. The clicks below are from
-    # TAB 1, scaled to have a horizontal size of 1150 pixels.
-    manual_tab1_reticle=manual_tab1_reticles[channel]
+def get_lattice(mission:int,channel:str)->list[tuple[int,int]]:
+    """
+
+    :param mission:
+    :param channel:
+    :return:
+    """
+    xlattice,ylattice=lattice_config[mission][channel]
+    n_lattice=len(xlattice)*len(ylattice)
+    lattice=[None]*n_lattice
+    for i_y, y in enumerate(ylattice):
+        for i_x, x in enumerate(xlattice):
+            i = i_y * 5 + i_x
+            lattice[i]=(i_x,i_y)
+    return lattice
+
+
+def get_manual_reticle(mission:int,channel:str,img1:np.ndarray)->list[tuple[float,float]]:
+    """
+
+    :param mission: Mission number, IE 7=Ranger 7, etc.
+    :param channel: Either A, B, or P
+    :param img1: image from tab1, scaled to its nominal size (IE 1150 wide for A and B)
+    :return: A list of tuples, each of which is the x and y location of a manual click
+             on the scaled images.
+    """
+
+    manual_tab1_reticles={7:{
+        "A":[
+            #  xdata     ydata
+            (  74.571,   235.829),
+            ( 314.931,   236.818),
+            ( 558.917,   235.170),
+            ( 808.148,   233.955),
+            (1060.956,   231.900),
+            (  76.603,   478.858),
+            ( 317.079,   479.016),
+            ( 561.931,   476.805),
+            ( 809.468,   475.069),
+            (1060.635,   474.595),
+            (  77.909,   722.763),
+            ( 318.815,   721.816),
+            ( 563.352,   720.711),
+            ( 811.046,   719.922),
+            (1060.793,   720.553),
+            (  77.120,   968.879),
+            ( 318.973,   969.668),
+            ( 564.142,   969.826),
+            ( 811.836,   970.615),
+            (1060.793,   972.668),
+        ],
+        "B":[
+            (  91.531,   219.808), #  0
+            ( 330.130,   223.859), #  1
+            ( 572.052,   225.833), #  2
+            ( 818.025,   227.391), #  3
+            (1066.802,   229.676), #  4
+            (  90.077,   459.653), #  5
+            ( 329.195,   462.249), #  6
+            ( 570.493,   463.496), #  7
+            ( 815.532,   465.158), #  8
+            (1063.167,   467.755), #  9
+            (  87.273,   702.717), # 10
+            ( 327.325,   703.340), # 11
+            ( 569.143,   704.275), # 12
+            ( 813.974,   705.937), # 13
+            (1060.466,   710.508), # 14
+            (  81.560,   950.664), # 15
+            ( 323.378,   950.872), # 16
+            ( 566.858,   951.910), # 17
+            ( 812.104,   954.092), # 18
+            (1058.389,   959.285), # 19
+        ]},
+        8:{"A":[
+            (  80.959,   243.018), #  0
+            ( 325.298,   246.223), #  1
+            ( 573.123,   245.945), #  2
+            ( 825.547,   243.296), #  3
+            (1080.201,   239.951), #  4
+            (  83.468,   484.848), #  5
+            ( 327.807,   487.079), #  6
+            ( 575.074,   485.685), #  7
+            ( 826.244,   483.455), #  8
+            (1080.062,   482.339), #  9
+            (  83.468,   728.491), # 10
+            ( 328.922,   729.606), # 11
+            ( 576.607,   728.909), # 12
+            ( 827.916,   727.516), # 13
+            (1081.455,   729.328), # 14
+            (  81.377,   976.594), # 15
+            ( 328.086,   977.291), # 16
+            ( 576.747,   978.267), # 17
+            ( 828.753,   978.685), # 18
+            (1083.407,   983.703), # 19
+            ],
+        "B":[
+            #(  79.275,    32.796), #  0
+            #( 325.680,    34.996), #  1
+            #( 577.271,    35.782), #  2
+            #( 833.734,    33.582), #  3
+            #(1094.597,    32.010), #  4
+            (  80.532,   265.844), #  5
+            ( 326.780,   266.787), #  6
+            ( 577.114,   265.687), #  7
+            ( 832.162,   263.330), #  8
+            (1091.296,   261.287), #  9
+            (  81.789,   497.006), # 10
+            ( 328.509,   496.063), # 11
+            ( 578.528,   493.549), # 12
+            ( 833.419,   492.292), # 13
+            (1090.668,   491.349), # 14
+            (  83.046,   730.525), # 15
+            ( 330.237,   728.168), # 16
+            ( 580.571,   726.125), # 17
+            ( 835.148,   725.654), # 18
+            (1091.768,   726.911), # 19
+            (  81.003,   966.088), # 20
+            ( 330.237,   964.673), # 21
+            ( 581.514,   963.573), # 22
+            ( 836.720,   964.830), # 23
+            (1092.554,   969.231), # 24
+            ]}
+        }
+
+    if mission in manual_tab1_reticles and channel in manual_tab1_reticles[mission]:
+        # Clicks have already been collected. The clicks below are from
+        # TAB 1, scaled to have a horizontal size of 1150 pixels.
+        manual_tab1_reticle=manual_tab1_reticles[mission][channel]
+    else:
+        # Collect the clicks
+        xlattice, ylattice = lattice_config[mission][channel]
+        n_lattice = len(xlattice) * len(ylattice)
+        manual_tab1_reticle = [None] * n_lattice
+        current_click = 0
+
+        def on_click(event):
+            if event.button==MouseButton.RIGHT:
+                nonlocal current_click
+                manual_tab1_reticle[current_click]=(event.xdata, event.ydata)
+                print(f"    ({event.xdata:8.3f},  {event.ydata:8.3f}), # {current_click:2d}")
+                plt.plot(event.xdata,event.ydata,'b+')
+                plt.pause(0.001)
+                current_click+=1
+        plt.close('all')
+        plt.figure(1)
+        plt.clf()
+        plt.imshow(img1)
+        plt.title(f"Ranger {mission:1d} channel {channel}")
+        plt.connect('button_press_event', on_click)
+        plt.show()
+    return manual_tab1_reticle
+
 
 def calc_M_im_lat(reticle_points:np.ndarray, img:np.ndarray=None)->np.ndarray:
     """
@@ -255,12 +377,6 @@ def calc_M_im_lat(reticle_points:np.ndarray, img:np.ndarray=None)->np.ndarray:
         plt.show()
     return A
 
-# A is now the matrix which best converts integer lattice points to reticle coordinates
-# on an 1150-column image. Name it according to our convention M_to_from -- Matrix which
-# transforms the lattice onto image1
-M_im1_lat=calc_M_im_lat(manual_tab1_reticle)
-
-# Dig out each reticle mark, and make a mask out of it
 
 def sample_img_boxes(img:np.ndarray,
                      reticle_points:Iterable[tuple[float,float]],
@@ -275,7 +391,7 @@ def sample_img_boxes(img:np.ndarray,
     :param box_r: Square radius to sample around each reticle point
     :return: List of images
     """
-    img_boxes=[None]*20
+    img_boxes=[None]*len(reticle_points)
     for i_reticle, (click_x,click_y) in enumerate(reticle_points):
         click_x = int(click_x)
         click_y = int(click_y)
@@ -297,124 +413,128 @@ def sample_img_boxes(img:np.ndarray,
     return img_boxes
 
 
-def synthetic_mark(*,
-                   r:int=50,l:int=30,w2:int=2,
-                   n:bool,s:bool,e:bool,w:bool,
-                   bg:int=0,fg:int=255)->np.ndarray:
-    result=np.zeros((r*2,r*2),dtype=np.uint8)+bg
-    if n:
-        result[r-l:r+w2,r-w2:r+w2]=fg
-    if s:
-        result[r-w2:r+l,r-w2:r+w2]=fg
-    if e:
-        result[r-w2:r+w2,r-w2:r+l]=fg
-    if w:
-        result[r-w2:r+w2,r-l:r+w2]=fg
-    return result
-synthetic_masks=[
-    synthetic_mark(n=True , s=True , e=True , w=False),
-    synthetic_mark(n=False, s=True , e=True , w=False),
-    synthetic_mark(n=False, s=True , e=True , w=True ),
-    synthetic_mark(n=False, s=True , e=False, w=True ),
-    synthetic_mark(n=True , s=True , e=False, w=True ),
+def auto_rectify(mission:int,channel:str):
+    """
 
-    synthetic_mark(n=True , s=True , e=True , w=False),
-    synthetic_mark(n=True , s=True , e=True , w=False),
-    synthetic_mark(n=True , s=True , e=True , w=True ),
-    synthetic_mark(n=True , s=True , e=False, w=True ),
-    synthetic_mark(n=True , s=True , e=False, w=True ),
+    :param mission:
+    :param channel:
+    :return:
+    """
+    # A is now the matrix which best converts integer lattice points to reticle coordinates
+    # on an 1150-column image. Name it according to our convention M_to_from -- Matrix which
+    # transforms the lattice onto image1
+    tab = 1
+    infn = f"raw_images/{mission:1d}{channel}/Ranger{mission:1d}{channel}{tab:03d}.jpg"
+    bigimg1 = mpimg.imread(infn)
+    image_sizes={7:{"A":1150,"B":1150},8:{"A":1150,"B":1150},9:{"A":1150,"B":1150}}
+    try:
+        mkdir(f"rect_images/{mission:1d}{channel}")
+    except FileExistsError:
+        oufns=glob("rect_images/{mission:1d}{channel}/*.png")
+        for oufn in oufns:
+            remove(oufn)
+    image_size=image_sizes[mission][channel]
+    img1 = scaledown(bigimg1,image_size)
 
-    synthetic_mark(n=True , s=True , e=True , w=False),
-    synthetic_mark(n=True , s=False, e=True , w=False),
-    synthetic_mark(n=True , s=False, e=True , w=True ),
-    synthetic_mark(n=True , s=False, e=False, w=True ),
-    synthetic_mark(n=True , s=True , e=False, w=True ),
+    print(f"{infn},{img1.shape},{img1.dtype}")
 
-    synthetic_mark(n=True , s=False, e=True , w=False, l=50),
-    synthetic_mark(n=True , s=False, e=True , w=True ),
-    synthetic_mark(n=True , s=False, e=True , w=True ),
-    synthetic_mark(n=True , s=False, e=True , w=True ),
-    synthetic_mark(n=True , s=False, e=False, w=True , l=50),
+    manual_tab1_reticle=get_manual_reticle(mission,channel,img1)
+    M_im1_lat = calc_M_im_lat(manual_tab1_reticle)
 
-]
-lattice=[None]*20
-for i_y, y in enumerate((-1, 0, 1, 2)):
-    for i_x, x in enumerate((-2, -1, 0, 1, 2)):
-        i = i_y * 5 + i_x
-        lattice[i]=(i_x,i_y)
-img1_boxes=sample_img_boxes(img1,manual_tab1_reticle)
+    img1_boxes = sample_img_boxes(img1, manual_tab1_reticle)
 
+    synthetic_masks=get_synthetic_masks(mission,channel)
 
-# For each subsequent image:
-for tab in range(1,200):
-    infn = f"{img_root}/7{channel}/Ranger7{channel}{tab:03d}.jpg"
-    oufn = f"{img_root}/7{channel}/Rect7{channel}{tab:03d}.png"
-    invoufn = f"{img_root}/7{channel}/Recti7{channel}{tab:03d}.png"
-    # Scale down to 1150 lines
-    bigimgn=mpimg.imread(infn)
-    M_imn_big=calc_M_img_big(bigimgn.shape)
-    imgn = scaledown(bigimgn)
-    plt.figure(2)
-    plt.clf()
-    plt.imshow(imgn[:1000,:])
-    plt.title(f"TAB {tab}")
-    plt.plot([x for x,y in manual_tab1_reticle],[y for x,y in manual_tab1_reticle],'r+')
-    auto_tabn_reticle = [None]*20
+    # For each subsequent image:
+    infns=sorted(glob(f"raw_images/{mission:1d}{channel}/Ranger{mission:1d}{channel}*.jpg"))
+    box_r=50
+    xbox=np.array([-1,1,1,-1,-1])*box_r
+    ybox=np.array([-1,-1,1,1,-1])*box_r
 
-    # Dig out the region around each reticle mark using click centers from TAB 1
-    imgn_boxes=sample_img_boxes(imgn,manual_tab1_reticle)
-    for i_reticle,(this_box,this_mark,(x_img1,y_img1)) in enumerate(zip(imgn_boxes,synthetic_masks,manual_tab1_reticle)):
-        # Use image correlation to match the reticle mask from TAB 1 to each reticle mark
-        cross=cross_image(im=255-this_box,im_ref=this_mark)
-        yofs,xofs=img_offset(cross=cross,bbox_r=20)
-        auto_tabn_reticle[i_reticle]=(x_img1+xofs,y_img1+yofs)
+    for infn in infns:
+        if match:=re.match(f".*/Ranger{mission:1d}{channel}(?P<tab>[0-9][0-9][0-9]).jpg",infn):
+            tab=int(match.group("tab"))
+        else:
+            raise ValueError("Couldn't get TAB number out of filename")
+        oufn = f"rect_images/{mission:1d}{channel}/Rect{mission:1d}{channel}{tab:03d}.png"
+        # Scale down to 1150 lines
+        bigimgn=mpimg.imread(infn)
+        M_imn_big=calc_M_img_big(bigimgn.shape,image_size)
+        imgn = scaledown(bigimgn,image_size)
+        plt.figure(2)
+        plt.clf()
+        plt.imshow(imgn)
+        plt.title(f"TAB {tab}")
+
+        for x,y in manual_tab1_reticle:
+            plt.plot(x+xbox,y+ybox,'r-')
+        auto_tabn_reticle = [None]*20
+
+        # Dig out the region around each reticle mark using click centers from TAB 1
+        imgn_boxes=sample_img_boxes(imgn,manual_tab1_reticle,box_r=box_r)
+        for i_reticle,(this_box,this_mark,(x_img1,y_img1)) in enumerate(zip(imgn_boxes,synthetic_masks,manual_tab1_reticle)):
+            # Use image correlation to match the reticle mask from TAB 1 to each reticle mark
+            cross=cross_image(im=255-this_box,im_ref=this_mark)
+            yofs,xofs=img_offset(cross=cross,bbox_r=20)
+            auto_tabn_reticle[i_reticle]=(x_img1+xofs,y_img1+yofs)
+            if tab==3 and False:
+                plt.figure(4)
+                plt.clf()
+                plt.subplot(2,2,1)
+                plt.imshow(255-this_box)
+                plt.title(f"This box")
+                plt.plot(box_r+xofs,box_r+yofs,'r+')
+                plt.subplot(2,2,2)
+                plt.title(f"img1 box")
+                plt.imshow(255-img1_boxes[i_reticle])
+                plt.subplot(2,2,3)
+                plt.title(f"synthetic mask")
+                plt.imshow(synthetic_masks[i_reticle])
+                plt.subplot(2,2,4)
+                plt.title(f"cross")
+                plt.imshow(cross)
+                plt.figure(5)
+                plt.plot(x_img1+xofs,y_img1+yofs,'r+')
+                plt.pause(0.001)
         if tab==3 and False:
-            plt.figure(4)
-            plt.clf()
-            plt.subplot(2,2,1)
-            plt.imshow(255-this_box)
-            plt.title(f"This box")
-            plt.plot(50+xofs,50+yofs,'r+')
-            plt.subplot(2,2,2)
-            plt.title(f"img1 box")
-            plt.imshow(255-img1_boxes[i_reticle])
-            plt.subplot(2,2,3)
-            plt.title(f"synthetic mask")
-            plt.imshow(synthetic_masks[i_reticle])
-            plt.subplot(2,2,4)
-            plt.title(f"cross")
-            plt.imshow(cross)
-            plt.figure(5)
-            plt.plot(x_img1+xofs,y_img1+yofs,'r+')
-            plt.pause(0.001)
-    if tab==3 and False:
-        plt.show()
+            plt.show()
+        plt.figure(2)
+        plt.plot([x for x,y in auto_tabn_reticle],[y for x,y in auto_tabn_reticle],'w+')
+        plt.pause(0.1)
 
-    # * Do a nonlinear minimization to find the best-fit matrix M_imn_lat which maps the lattice
-    #   to this image
-    M_imn_lat=calc_M_im_lat(auto_tabn_reticle)
-    # * Get the matrix which transforms from imn to im1:
-    M_lat_imn=np.linalg.inv(M_imn_lat)
-    M_im1_imn=M_im1_lat@M_lat_imn
-    M_im1_big=M_im1_imn@M_imn_big
-    # Now if we transform auto_tabn_reticle with M_im1_imn, it *should* approximately
-    # hit the reticle marks on img1. So, plot this and find out.
-    plt.figure(1)
-    plt.clf()
-    plt.imshow(img1)
-    plt.title(f"TAB 1 with transformed TAB {tab} reticle points")
-    for x,y in auto_tabn_reticle:
-        v_imn=np.array([[x],[y],[1]])
-        v_im1=M_im1_imn @ v_imn
-        plt.plot(v_im1[0,0],v_im1[1,0],'w+')
-    print(M_im1_imn)
-    # * Use the affine transform to map this image into the same space as image1
-    rectified = transform_image(bigimgn, M_im1_big, output_shape=(1080,1150))
-    plt.figure(3)
-    plt.clf()
-    plt.imshow(rectified)
-    plt.title(f"rectified TAB {tab}")
-    plt.plot([x for x,y in manual_tab1_reticle],[y for x,y in manual_tab1_reticle],'r+')
-    plt.pause(0.001)
-    Image.fromarray(rectified.astype(np.uint8), mode='L').save(oufn)
+        # * Do a nonlinear minimization to find the best-fit matrix M_imn_lat which maps the lattice
+        #   to this image
+        M_imn_lat=calc_M_im_lat(auto_tabn_reticle)
+        # * Get the matrix which transforms from imn to im1:
+        M_lat_imn=np.linalg.inv(M_imn_lat)
+        M_im1_imn=M_im1_lat@M_lat_imn
+        M_im1_big=M_im1_imn@M_imn_big
+        # Now if we transform auto_tabn_reticle with M_im1_imn, it *should* approximately
+        # hit the reticle marks on img1. So, plot this and find out.
+        plt.figure(1)
+        plt.clf()
+        plt.imshow(img1)
+        plt.title(f"TAB 1 with transformed TAB {tab} reticle points")
+        for x,y in auto_tabn_reticle:
+            v_imn=np.array([[x],[y],[1]])
+            v_im1=M_im1_imn @ v_imn
+            plt.plot(v_im1[0,0],v_im1[1,0],'w+')
+        print(M_im1_imn)
+        # * Use the affine transform to map this image into the same space as image1
+        rectified = transform_image(bigimgn, M_im1_big, output_shape=(1150,1150))
+        plt.figure(3)
+        plt.clf()
+        plt.imshow(rectified)
+        plt.title(f"rectified TAB {tab}")
+        plt.plot([x for x,y in manual_tab1_reticle],[y for x,y in manual_tab1_reticle],'r+')
+        plt.pause(0.1)
+        Image.fromarray(rectified.astype(np.uint8), mode='L').save(oufn)
 
+
+def main():
+    # auto_rectify(7,"A")
+    auto_rectify(8,"B")
+
+
+if __name__=="__main__":
+    main()
