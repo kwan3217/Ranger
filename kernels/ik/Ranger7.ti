@@ -1,0 +1,362 @@
+KPL/IK
+
+Ranger 7 instrument kernel
+==============================================================================
+
+   This instrument kernel (I-kernel) contains references to the mounting
+   alignment, internal and FOV geometry for the Ranger 7 Television
+   experiment.
+
+   Ranger 7 was obviously operated long before the era of Spice, but it was
+   sufficiently well-documented enough to construct Spice kernels
+   after-the-fact. The primary source of instrument field-of-view is the
+   Photographic Parameters tables, which include the lunar surface geometry of
+   each reticle mark, as well as the position and velocity of the spacecraft
+   at the time the image was taken. From these, vectors can be constructed
+   from the spacecraft to known points on the ground, and we can do the usual
+   dot and cross product stuff to determine the orientation of these vectors
+   relative to each other. The actual frame edge is not well-defined, but we
+   do have enough data to construct a rough representative frame edge for
+   the first frame of each image series.
+
+
+Version and Date
+----------------------------------------------------------
+
+   Version 000 -- 2024-03-07 -- kwan3217
+
+            --   Draft Version. NOT YET APPROVED BY INSTRUMENT TEAM.
+
+
+
+References
+-------------------------------------------------------------------------------
+
+   1. Kernel Pool Required Reading
+
+   2. GETFOV, getfoc_c, cspice_getfov headers
+
+   3. Ranger 7 FK file
+
+   4. Ranger VII Photographic Parameters
+       https://ntrs.nasa.gov/citations/19670002488
+
+
+Implementation Notes
+-------------------------------------------------------------------------------
+
+   This file is used by the SPICE system as follows: programs that make
+   use of this kernel must ``load'' the kernel, normally during program
+   initialization. The SPICE routine FURNSH loads a kernel file into
+   the pool as shown below.
+
+      CALL FURNSH ( 'frame_kernel_name; )    -- FORTRAN
+      furnsh_c ( "frame_kernel_name" );      -- C
+      cspice_furnsh, frame_kernel_name       -- IDL
+      cspice_furnsh( 'frame_kernel_name' )   -- MATLAB
+      spiceypy.furnsh('frame_kernel_name')   -- Python
+
+   Once the file has been loaded, the SPICE routine GETFOV (getfov_c in
+   C, cspice_getfov in IDL and MATLAB, spiceypy.getfov in Python) can be
+   used to retrieve FOV parameters for a given instrument or structure.
+
+   This file was created and may be updated with a text editor or word
+   processor.
+
+Naming Conventions
+----------------------------------------------------------
+
+   All names referencing values in this IK file start with the
+   characters `INS' followed by the NAIF EMM ID number (-62)
+   followed by a NAIF three digit ID code for EXI or one of
+   its detectors or components. The mapping below reflects the 
+   mapping to be used by instruments subsequent to the discussions
+   of May and June 2020.
+
+   Purely on my own authority without reference to anyone else,
+   I hereby declare that the Ranger spacecraft series are numbered
+   as -1000-(serial number). So, Ranger 7 is spacecraft -1007.
+
+   Further, the Ranger frames are (Spacecraft number)*1000 for the
+   spacecraft body, (Spacecraft number)*1000-101 for camera A,
+   -102 for camera B, and -201 through -204 for cameras P1 through
+   P4 respectively.
+
+   This is the full list of names and IDs described by this IK file:
+
+      RANGER7_A                 -1007101
+      RANGER7_B                 -1007102
+      RANGER7_P1                -1007201
+      RANGER7_P2                -1007202
+      RANGER7_P3                -1007203
+      RANGER7_P4                -1007204
+      RANGER7_HGA               -1007301
+
+\begindata
+   NAIF_BODY_NAME+=('RANGER7_A',
+                    'RANGER7_B',
+                    'RANGER7_P1',
+                    'RANGER7_P2',
+                    'RANGER7_P3',
+                    'RANGER7_P4')
+   NAIF_BODY_CODE+=(-1007101,
+                    -1007102,
+                    -1007201,
+                    -1007202,
+                    -1007203,
+                    -1007204)
+\begintext
+
+   The remainder of the keyword name is an underscore character
+   followed by the unique name of the data item. For example, the -62101
+   boresight direction provided as a part of its FOV definition is
+   specified by:
+
+      INS-62101_BORESIGHT
+
+   The upper bound on the length of the name of any data item is 32
+   characters.
+
+   If the same item is included in more than one file, or if the same
+   item appears more than once within a single file, the latest value
+   supersedes any earlier values.
+
+
+Mounting Alignment
+--------------------------------------------------------
+
+   Refer to the latest version of the EMM Frames Definition Kernel
+   (FK) [3] for the EMM structures reference frame definitions and
+   mounting alignment information.
+
+
+Instrument Description
+---------------------------------------------------------
+
+   EXI has two imaging channels, UV and VIS. Each channel has an
+   independent lens and detector. The channels share a filter wheel,
+   which will simultaneously put one of the visible filters into
+   the VIS channel and one of the UV filters into the UV channel.
+
+
+
+Instrument Detector/Sensor Layout
+----------------------------------------------------------
+
+   The EXI instrument has two imaging detectors, UV and VIS.
+
+   Corner vectors are all normalized to unit length.
+
+
+Instrument Detector/Sensor Parameters
+----------------------------------------------------------
+
+    EXI has the following detector parameters:
+
+       -----------------------------------------------------------------
+       parameter                        value
+       -----------------------------------------------------------------
+       Detector size in pixels          4096 x 3072
+       -----------------------------------------------------------------
+
+       \begindata
+
+       INS-62101_PIXEL_SAMPLES       = ( 4096 )
+       INS-62101_PIXEL_LINES         = ( 3072 )
+
+       INS-62102_PIXEL_SAMPLES       = ( 4096 )
+       INS-62102_PIXEL_LINES         = ( 3072 )
+
+       \begintext
+
+Instrument Optical Parameters
+----------------------------------------------------------
+
+    Integer pixel coordinates indicate the center of each pixel. Rows are
+    numbered with the "bottom" row, in the direction of instrument frame +Y,
+    numbered as zero, up to 3071 for the "top" row in the instrument frame -Y.
+    Columns are numbered from the "left", in the direction of instrument
+    frame -X, to "right" in the instrument frame +X
+
+    The optical axis does not pass through the center of the detector, but
+    instead through the pixel given in INS-XXX_DETECTOR_CENTER, which is
+    different for each channel, and identified as (x0,y0) in pseudocode
+    below.
+
+      * Figure 1 -- looking along boresight in direction camera looks,
+        through the detector
+
+      (0,3071)                                         (4095,3071)
+        +------------------< -X | +X >----------------------+
+        |                                                   |
+        |                                                   |
+        |                                                   |
+        |                                                   |
+        ^                                                   |
+       -Y                        (x0,y0)                    |
+        -                       +---> +X                    |
+       +Y                       |                           |
+        v                       |                           |
+        |                       v +Y                        |
+        |                                                   |
+        |                                                   |
+        |                                                   |
+        +---------------------------------------------------+
+      (0,0)                                              (4095,0)
+
+    The distortion model for each channel and filter in EXI is the same,
+    but the coefficients for each channel and filter are different. This
+    follows section 3.3.3 in [4]. That model calculates the distortion of
+    each pixel, defined as the distance each pixel needs to be moved in order
+    to land where the pinhole model would predict. We therefore talk about
+    "pinhole" and "lens" coordinates, where lens coordinates are where
+    pixel vectors actually fall, and pinhole coordinates are where the
+    pixel vectors would fall in a pinhole camera with the same equivalent
+    focal length.
+
+    To find the angle of a pixel from the optical axis, given the lens 
+    pixel coordinate, you must first find the pinhole equivalent pixel 
+    location, then calculate the angle from that equivalent pixel location.
+    
+      r=sqrt((x-x0)**2+(y-y0)**2)  # lens coordinate distance from optical center (x0,y0) of detector
+      dr=k1*r**3+k2*r**5+k3*r**7   # Distortion amount in pixels
+      r'=r+dr                      # Correct for distortion. This calculates the pinhole
+                                   #   camera radial distance given the lens radial distance.
+      tan(theta)=r'/k0             # Pinhole camera model, with camera equivalent
+                                   #   focal length k0 in pixels
+
+    This model can be reversed:
+    
+      tan(theta)=r'/k0       
+      solve for r:
+        r'=r + k1*r**3 + k2*r**5 + k3*r**7 
+        
+   This requires inverting a 7th order polynomial. In the operational code,
+   this is done by table interpolation
+   
+      r=[0..3500]                  # Range of possible lens distances,
+                                   #   extending further than strictly needed
+      dr=k1*r**3+k2*r**5+k3*r**7   # Distortion amount for each lens distance
+      r'=r+dr                      # Pinhole distance for each lens distance
+   
+   Now make a table with pinhole distance r' as the independent variable and 
+   distortion amount dr as dependent. The operational code uses 
+   numpy.interpolate.interp1d() :
+   
+      table=interp1d(r',dr)
+      
+   Then when needed, we use the table to interpolate the distortion amount,
+   given the pinhole distance.
+   
+      dr=table(r')
+      r=r'-dr
+    
+    The model requires an equivalent focal length in pixels, and third-, fifth-,
+    and seventh-order polynomial distortion coefficients. 
+
+    Units of k0 (equivalent focal length):   pixels (pix)
+    Units of k1 (third-order coefficient):   pix**-2
+    Units of k2 (fifth-order coefficient):   pix**-4
+    Units of k3 (seventh-order coefficient): pix**-6
+
+    Coefficients k0, k1, k2, and k3 for each channel n and filter i are reported
+    in INS<n>_<i>_K . 
+                                       
+    Coefficients are in scientific notation, but not fully normalized. The
+    exponent for the same order coefficient is the same all the way down, and
+    as a result the mantissa is not always in the range [1,10). This gives a 
+    practical advantage -- at a distance from 1000 pixels from the distortion
+    center, the exponent part cancels out. For instance, for the k1 term,
+    the exponent is 1e-9, and the r factor is (1000)**3=1e9. Looking at the
+    F320 polynomial, the coefficient is 38.90e-9, meaning that 1000 pixels
+    out, the distorted position is 38.90 pixels further from the center of
+    distortion due to this term.
+
+    Distortion model is fitted to post-launch EXI.008 measurement taken in
+    cruise, 2020-09-22.
+
+
+      UV Channel
+      ----------------------
+    \begindata
+
+    INS-62101_DETECTOR_CENTER = (1916.0,1580.0)
+    INS-62101_F320_K  = (8689.766, 38.902560e-09, -3.612263e-15,  0.530611e-21)
+    INS-62101_F260_K  = (8628.550, 37.564770e-09, -1.583326e-15,  0.130952e-21)
+    INS-62101_F220_K  = (8602.164, 38.362200e-09, -1.786978e-15,  0.189866e-21)
+    
+\begintext
+      VIS Channel
+      ----------------------
+    A third-order model fits the VIS filters adequately, with fifth and seventh
+    order coefficients constrained to exactly zero. This is because:
+
+    1) Their contribution is much less than 1 pixel 1000 pixels from the origin
+    2) They are statistically indistinguishable from zero -- their fit uncertainty
+       brackets zero.
+
+    \begindata
+
+    INS-62102_DETECTOR_CENTER = (2021.0,1544.0)
+    INS-62102_F635_K  = (9209.390, -8.717462e-09,  0.000000e-15,  0.000000e-21)
+    INS-62102_F546_K  = (9187.803, -8.764541e-09,  0.000000e-15,  0.000000e-21)
+    INS-62102_F437_K  = (9175.698, -8.881589e-09,  0.000000e-15,  0.000000e-21)
+
+    \begintext
+
+
+
+Instrument FOV Definitions
+----------------------------------------------------------
+
+   This section defines the following FOVs:
+
+     ID      SHAPE     FRAME                SIZE1 SIZE2 BSIT NOTE
+     ------- --------- -------------------- ----- ----- ---- ---------------
+     -62101 RECTANGLE HOPE_EXI_UV           25.39 19.04   +Z   
+     -62102 RECTANGLE HOPE_EXI_VIS          25.39 19.04   +Z
+
+   These fields of view are approximate - they don't include distortion.
+   They are suitable for visualizing the frustums, but the reference angle and
+   cross angle are not useful for doing pixel geolocation -- For that, use the
+   distortion model described above. Note that the boresight vector and
+   reference vector ARE used in pixel geolocation. The geolocation model
+   has only been tested with boresight being +Z and reference being +X --
+   use other values at your own risk.
+
+   In both channels, the long (reference) axis of the detector is along +X,
+   and the short axis is along +Y.
+
+   In general, the instrument boresight (distortion center axis) and reference
+   axis can be in any direction, as long as they are perpendicular. In practice,
+   we will take the instrument boresight to *define* the instrument frame +Z,
+   and the long edge of the detector to *define* instrument frame +X. We assume
+   that the detector is perpendicular to the distortion center axis and that
+   the rows and columns of the detector are perfectly perpendicular.
+
+   The FOVs are defined in this data block. Note that the REF_ANGLE and
+   CROSS_ANGLE are half-angles. 
+
+      \begindata
+
+      INS-62101_FOV_CLASS_SPEC       = 'ANGLES'
+      INS-62101_FOV_SHAPE            = 'RECTANGLE'
+      INS-62101_FOV_FRAME            = 'HOPE_EXI_UV'
+      INS-62101_BORESIGHT            = ( 0.0,         0.0,        1.0        )
+      INS-62101_FOV_REF_VECTOR       = ( 1.0,         0.0,        0.0        )
+      INS-62101_FOV_REF_ANGLE        = ( 12.695  )
+      INS-62101_FOV_CROSS_ANGLE      = ( 9.52125 )
+      INS-62101_FOV_ANGLE_UNITS      = ( 'DEGREES' )
+
+      INS-62102_FOV_CLASS_SPEC       = 'ANGLES'
+      INS-62102_FOV_SHAPE            = 'RECTANGLE'
+      INS-62102_FOV_FRAME            = 'HOPE_EXI_VIS'
+      INS-62102_BORESIGHT            = ( 0.0,         0.0,        1.0        )
+      INS-62102_FOV_REF_VECTOR       = ( 1.0,         0.0,        0.0        )
+      INS-62102_FOV_REF_ANGLE        = ( 12.695  )
+      INS-62102_FOV_CROSS_ANGLE      = ( 9.52125 )
+      INS-62102_FOV_ANGLE_UNITS      = ( 'DEGREES' )
+
+      \begintext
+
+End of the IK file.
