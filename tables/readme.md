@@ -54,3 +54,11 @@ data from the tables.
   that is way too much to type. The time, latitude, longitude,
   altitude, and velocity vector of the spacecraft at that point 
   are available from the TAB143 row of `trajectory_7a.csv` .
+* `geocentric_7.csv` Geocentric state vector in Earth Equatorial
+  True of Date frame, from [Ranger VII Flight Path and its
+  Determination from Tracking Data](https://ntrs.nasa.gov/citations/19650003678).
+  This table includes both the pre-maneuver (Appendix B, pp89-95)
+  and post-maneuver (Appendix C, pp96-110) vectors, at about 1 hour
+  intervals. The last position is about 75ms before impact.
+* `selenocentric_7.csv` Selenocentric state vector from Appendix C
+  above. The vectors are still in 

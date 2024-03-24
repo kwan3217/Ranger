@@ -31,43 +31,73 @@ result in successful imagery:
   transmitted no pictures. Since this was the sole science instrument, the
   whole mission was a failure.
   
+## Camera Hardware
+
 Rangers 7, 8, and 9 were all completely successful. They were the Ranger Block
 III spacecraft (as was Ranger 6), which deleted all science except for the
 cameras. These missions carried a fix for the problem which doomed the Ranger 6
-camera, and all of them worked. The block III spacecraft carried six cameras
-that transmitted back on two channels:
+camera, and all of them worked. 
 
-* Channel F (for Full scan) carried cameras A and B, which fired alternately on a 2.56s cadence
-  (each camera therefore was on a 5.12s cadence). Camera A used a 25mm focal length
-  wide-field lens, and had a field of view of about 22x24deg. Camera B used a 75mm
-  focal length telephoto lens, and had a field of view of 9x8deg. Each camera was scanned with 1150
-  scan lines. Each camera scanned the full design area (about 11x11mm) of the vidicon tube face
-  with those 1150 lines. It takes 2.56s to scan and transmit each image, so while one camera is
-  being scanned and transmitted, the other is being erased and exposed for the next image.
-  No attempt was made to synchronize the camera cycle with impact, so the impact effectively
-  was at a uniformly-distributed random time during the last camera cycle. One of the cameras
-  will have taken an image between 5.12s and 2.56s before impact and completely transmitted it,
-  while the other will have taken an image between 2.56s and 0.00s and be interrupted by impact
-  during transmission. Since the vertical speed of impact is about 2km/s, the last complete image
-  will be taken between 5 and 10km altitude, and the last partial at less than 5km 
-  altitude.
+All cameras use the same basic design philosophy, and much of the same
+hardware design. Each camera has a slow-scan vidicon tube. The camera
+is exposed for a short (few millisecond) time, then scanned and transmitted
+over a much longer time. The readout and transmission is fully analog --
+the readout of each line is used to modulate an FM signal which is then
+transmitted back to Earth over the high-gain antenna.
+
+The block III spacecraft carried six cameras
+that transmitted back on two channels. Each channel has its own
+60W FM transmitter on its own frequency, but both channels
+share the high-gain antenna. 
+
+The analog television technology of the 1960s can easily transmit
+full-motion (480i30) video. So, why didn't Ranger transmit at
+30fps? Any signal using any modulation has a maximum signal rate,
+determined largely by the signal-to-noise ratio. Since Ranger
+uses a watt-level rather than kilowatt-level transmitter, and
+since it is *much* farther away than the range of any normal 
+television broadcast, it has a lower signal and therefore lower
+signal-to-noise ratio than normal television. The system compensates
+by transmitting the signal *much* slower. 
+
+### Channel F
+Channel F (for Full scan) carried cameras A and B, which fired alternately on a 2.56s cadence
+(each camera therefore was on a 5.12s cadence). Camera A used a 25mm focal length
+wide-field lens, and had a field of view of about 22x24deg. Camera B used a 75mm
+focal length telephoto lens, and had a field of view of 9x8deg. 
+
+Each camera was scanned with 1150 scan lines. Each camera scanned the full design area (about 11x11mm) of the vidicon tube face
+with those 1150 lines. It takes 2.56s to scan and transmit each image, so while one camera is
+being scanned and transmitted, the other is being erased and exposed for the next image.
+
+No attempt was made to synchronize the camera cycle with impact, so the impact effectively
+was at a uniformly-distributed random time during the last camera cycle. One of the cameras
+will have taken an image between 5.12s and 2.56s before impact and completely transmitted it,
+while the other will have taken an image between 2.56s and 0.00s and be interrupted by impact
+during transmission. Since the vertical speed of impact is about 2km/s, the last complete image
+will be taken between 5 and 10km altitude, and the last partial at less than 5km 
+altitude.
+
+### Channel P
 * Channel P (for Partial scan) carried cameras P1, P2, P3, and P4. These had a narrow field
   of view, but were not designed for higher resolution. Instead, they were designed to fire
   and readout as frequently as possible, so that the last image is as close as possible to the
-  surface. 
-  Each of these fired in turn on a 0.21s cadence, so each camera
-  individually was on a 0.84s cadence. Since a camera fires about every 0.2s, and the spacecraft
-  has a vertical speed of about 2km/s, we expect the last image taken to be from an altitude of 
-  less than 400m, and for the last complete image to be from between 800 and 400m. 
-  Cameras P1 and P2 used the same optics as B (75mm lens) and resulted in the narrowest
-  fields of view at about 2x2deg, while P3 and P4 used the same optics
-  as A and had medium-fields at about 6x6deg. The P cameras had the same vidicon tube
+  surface. The P cameras had the same vidicon tube
   and electronics, but only scanned about 3x3mm of the vidicon tube face. Because of
   this partial scan, the cameras had a narrower field of view even with the same camera
   optics. It's similar to the old "digital zoom" on older digital 
   cameras, that just saved the middle part of the image at the same
-  pixel angular resolution but fewer pixels. Each of these cameras was scanned with only
-  300 scan lines, meaning that P1 had slightly worse resolution than camera B.
+  pixel angular resolution but fewer pixels. Cameras P1 and P2 shared the 75mm optics design
+  of camera B and therefore had nearly identical angular resolution to B.
+  Similarly, P3 and P4 shared the 25mm optics design with camera A, and
+  therefore had nearely identical angular resolution.
+  Each of these fired in turn on a 0.20s cadence, with an additional 0.04s pause at the end of
+  each cycle, so each camera individually was on a 0.84s cadence. Since a camera fires about
+  every 0.2s, and the spacecraft has a vertical speed of about 2km/s, we expect the last image taken to be from an altitude of 
+  less than 400m, and for the last complete image to be from between 800 and 400m. 
+  Cameras P1 and P2 used the same optics as B (75mm lens) and resulted in the narrowest
+  fields of view at about 2x2deg, while P3 and P4 used the same optics
+  as A and had medium-fields at about 6x6deg. 
 
 The partial scan cameras could be fired much quicker than the full-scan
 cameras. The F cameras had a mechanical shutter with a 5ms exposure
