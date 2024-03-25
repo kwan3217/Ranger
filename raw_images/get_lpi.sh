@@ -2,7 +2,7 @@
 #Script to get, resize, and convert all Ranger 7 camera images from the Lunar and Planetary Institute
 
 # Local folder to store data
-LOCAL_ROOT=./images
+LOCAL_ROOT=./
 
 #Ranger 7
 MISSION=7
