@@ -125,7 +125,6 @@ from collections import namedtuple
 from datetime import datetime, tzinfo, timedelta, timezone
 
 import numpy as np
-import pytz as pytz
 
 _dt0 = datetime(year=2000, month=1, day=1, hour=12, minute=0, second=0, microsecond=0, tzinfo=None)
 _jd0 = 2_451_545.0
