@@ -1,0 +1,1 @@
+Folder for scratch files, such as the ones used to drive `msopck`.
